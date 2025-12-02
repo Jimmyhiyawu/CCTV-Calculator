@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雙向監控計算機 SI實戰版 V4.2 (完美樣式修正)</title>
+    <style>
+        :root { 
+            --primary: #0f172a; 
+            --accent: #2563eb; 
+            --bg: #f8fafc; 
+            --card: #ffffff; 
+            --danger: #ef4444; 
+        }
+        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: var(--bg); padding: 20px; margin:0; line-height: 1.5; }
+        .container { width: 100%; max-width: 1240px; margin: 0 auto; background: var(--card); padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
+
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 25px; }
+        h2 { margin: 0; color: var(--primary); font-size: 1.9rem; display: flex; align-items: center; gap: 12px; }
+        .badge { background: #dbeafe; color: #1e40af; padding: 8px 16px; border-radius: 30px; font-weight: bold; font-size: 0.95rem; }
+
+        .mode-switcher { display: flex; background: #e2e8f0; padding: 8px; border-radius: 12px; margin-bottom: 25px; gap: 10px; }
+        .mode-btn { flex: 1; padding: 16px; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 1.05rem; background: transparent; color: #64748b; transition: 0.3s; }
+        .mode-btn.active { background: white; color: var(--accent); box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
+
+        .input-section { background: #eff6ff; padding: 24px; border-radius: 14px; border: 2px solid #bfdbfe; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between; }
+        .input-group label { font-size: 1.35rem; font-weight: 700; color: #1e40af; margin-right: 15px; }
+        .input-group input { padding: 12px 0; border: 3px solid #60a5fa; border-radius: 12px; width: 160px; text-align: center; font-size: 2rem; font-weight: bold; color: var(--accent); }
+        #inputUnit { font-size: 1.8rem; font-weight: bold; color: #1e40af; margin-left: 10px; }
+
+        .table-responsive { overflow-x: auto; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.1); margin-bottom: 25px; background: white; }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; }
+        th { background: #f1f5f9; color: #1e293b; padding: 18px 8px; font-weight: 700; text-align: center; font-size: 1rem; }
+        td { padding: 7px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: middle; }
+        
+        .cell { width: 100%; height: 52px; padding: 0 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 15px; box-sizing: border-box; }
+        select.cell, input.cell { background: white; }
+        
+        /* 【核心修正 CSS】
+           這裡統一了 select 與 input 的字型樣式，
+           text-align-last: center 是專門解決 Chrome 下拉選單不置中的語法。
+        */
+        .qty-style {
+            text-align: center;
+            text-align-last: center; /* 讓選中的項目在 Chrome 也能置中 */
+            font-size: 20px;         /* 字體加大 */
+            font-weight: 900;        /* 粗體 */
+            color: #1e40af;          /* 藍色 */
+            cursor: pointer;
+        }
+
+        /* 變身後的手動輸入框樣式 */
+        .count-input-manual {
+            background: #eff6ff !important;
+            border-color: #60a5fa !important;
+            cursor: text; /* 輸入時游標變更 */
+        }
+
+        .bitrate-display { font-family: 'Consolas', monospace; font-size: 19px; font-weight: bold; color: #1d4ed8; }
+
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; margin-top: 35px; }
+        .card { background: var(--primary); color: white; padding: 30px; border-radius: 16px; text-align: center; }
+        .card h4 { margin: 0 0 12px; font-size: 1.05rem; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
+        .card .value { font-size: 3rem; font-weight: 800; margin: 10px 0; color: #7dd3fc; }
+        .card .sub { font-size: 1rem; opacity: 0.9; }
+        .card.result-highlight { background: linear-gradient(135deg, #1d4ed8, #2563eb); transform: translateY(-8px); box-shadow: 0 15px 30px rgba(37,99,235,0.3); }
+
+        .add-btn { background: var(--accent); color: white; border: none; padding: 16px 32px; border-radius: 12px; font-size: 1.15rem; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
+        .add-btn:hover { background: #1d4ed8; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37,99,235,0.3); transition: 0.3s; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h2>雙向監控計算機</h2>
+        <div class="badge">SI 實戰版 V4.2</div>
+    </header>
+
+    <div class="mode-switcher">
+        <button class="mode-btn active" id="btnModeDays" onclick="setMode('days')">
+            指定天數 → 算容量
+        </button>
+        <button class="mode-btn" id="btnModeStorage" onclick="setMode('storage')">
+            指定硬碟 → 算天數
+        </button>
+    </div>
+
+    <div class="input-section">
+        <div class="input-group">
+            <label id="inputLabel">預計錄影天數 (Days)</label>
+            <input type="number" id="mainInput" value="30" min="1">
+            <span id="inputUnit">天</span>
+        </div>
+        <div style="color:#475569; font-size:0.95rem;">
+            自動包含 10% 系統緩衝 + 格式化耗損
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table id="calcTable">
+            <thead>
+                <tr>
+                    <th width="150">區域</th>
+                    <th width="220">解析度 (Resolution)</th>
+                    <th width="220">壓縮方式 (Codec)</th>
+                    <th width="100">張數 (FPS)</th>
+                    <th width="110">數量</th>
+                    <th width="100">單支碼流</th>
+                    <th width="30">刪除</th>
+                </tr>
+            </thead>
+            <tbody id="cameraRows"></tbody>
+        </table>
+    </div>
+
+    <button class="add-btn" onclick="addRow()">+ 新增鏡頭群組</button>
+
+    <div class="dashboard">
+        <div class="card">
+            <h4>所需總頻寬</h4>
+            <div class="value" id="resBandwidth">0 Mbps</div>
+            <div class="sub">NVR 輸入頻寬需大於此值</div>
+        </div>
+        
+        <div class="card result-highlight">
+            <h4 id="resultTitle">總儲存空間需求</h4>
+            <div class="value" id="resMainResult">0 TB</div>
+            <div class="sub" id="resultSub">已含緩衝與格式化耗損</div>
+        </div>
+
+        <div class="card">
+            <h4 id="suggestionTitle">硬碟採購建議</h4>
+            <div class="value" id="resSuggestion" style="color:#fbbf24; font-size:2.4rem;">-</div>
+            <div class="sub">監控專用碟 (Purple / SkyHawk)</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentMode = 'days';
+    const BITRATE_BASE = { '2mp': 4096, '4mp': 8192, '5mp': 10240, '8mp': 16384 };
+
+    function setMode(mode) {
+        currentMode = mode;
+        document.getElementById('btnModeDays').className = mode === 'days' ? 'mode-btn active' : 'mode-btn';
+        document.getElementById('btnModeStorage').className = mode === 'storage' ? 'mode-btn active' : 'mode-btn';
+
+        const label = document.getElementById('inputLabel');
+        const unit = document.getElementById('inputUnit');
+        const input = document.getElementById('mainInput');
+        if (mode === 'days') {
+            label.textContent = "📅 預計錄影天數 (Days)"; unit.textContent = "天"; input.value = 30;
+            document.getElementById('resultTitle').textContent = "總儲存空間需求";
+            document.getElementById('suggestionTitle').textContent = "硬碟採購建議";
+        } else {
+            label.textContent = "💾 既有硬碟容量 (HDD)"; unit.textContent = "TB"; input.value = 4;
+            document.getElementById('resultTitle').textContent = "可錄影天數";
+            document.getElementById('suggestionTitle').textContent = "錄影評估";
+        }
+        calculateAll();
+    }
+
+    function addRow() {
+        const tbody = document.getElementById('cameraRows');
+        const tr = document.createElement('tr');
+        // 注意：這裡的 select 加入了 class="cell count-select qty-style"
+        tr.innerHTML = `
+            <td><input type="text" placeholder="例: 大門、倉庫" class="cell"></td>
+            <td>
+                <select class="cell res-select" onchange="calculateAll()">
+                    <option value="2mp" selected>2MP / 1080P / 200萬</option>
+                    <option value="4mp">4MP / 1440P / 400萬 (2K)</option>
+                    <option value="5mp">5MP / 1920P / 500萬 (3K)</option>
+                    <option value="8mp">8MP / 2160P / 800萬 (4K)</option>
+                </select>
+            </td>
+            <td>
+                <select class="cell codec-select" onchange="calculateAll()">
+                    <option value="1" selected>H.264 (舊款)</option>
+                    <option value="0.5">H.265 (主流)</option>
+                    <option value="0.35">Smart H.265+ (AI)</option>
+                </select>
+            </td>
+            <td>
+                <select class="cell fps-select" onchange="calculateAll()">
+                    <option value="0.5">15 FPS</option>
+                    <option value="0.67">20 FPS</option>
+                    <option value="1" selected>30 FPS</option>
+                    <option value="2">60 FPS</option>
+                </select>
+            </td>
+            <td>
+                <select class="cell count-select qty-style" onchange="checkQty(this); calculateAll()">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                    <option value="24">24</option>
+                    <option value="32">32</option>
+                    <option value="custom" style="background:#eff6ff; color:#2563eb; font-size:16px; font-weight:normal;">✎ 自訂數量...</option>
+                </select>
+            </td>
+            <td style="font-size:19px;">
+                <span class="bitrate-display">--</span> Kbps
+            </td>
+            <td>
+                <button onclick="this.closest('tr').remove(); calculateAll()"
+                        style="background:#ef4444; color:white; border:none; width:44px; height:44px; border-radius:50%; font-size:21px; cursor:pointer;">X</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        calculateAll();
+    }
+
+    // 變身魔法：替換後的 input 也會繼承 qty-style
+    function checkQty(element) {
+        if (element.value === 'custom') {
+            const parent = element.parentElement;
+            parent.innerHTML = `
+                <input type="number" class="cell count-input count-input-manual qty-style" 
+                       value="1" min="1" onchange="calculateAll()" placeholder="輸入" autofocus>
+            `;
+            calculateAll();
+        }
+    }
+
+    function calculateAll() {
+        const rows = document.querySelectorAll('#cameraRows tr');
+        let totalBandwidthKbps = 0;
+
+        rows.forEach(row => {
+            const res = row.querySelector('.res-select').value;
+            const codec = parseFloat(row.querySelector('.codec-select').value);
+            const fps = parseFloat(row.querySelector('.fps-select').value);
+            
+            let countEl = row.querySelector('.count-select') || row.querySelector('.count-input');
+            let count = 1;
+            
+            if (countEl) {
+                if (countEl.value === 'custom') count = 1; 
+                else count = parseInt(countEl.value) || 0;
+            }
+
+            const single = BITRATE_BASE[res] * codec * fps * 0.9;
+            row.querySelector('.bitrate-display').textContent = Math.round(single).toLocaleString();
+            totalBandwidthKbps += single * count;
+        });
+
+        const totalMbps = totalBandwidthKbps / 1024;
+        document.getElementById('resBandwidth').textContent = totalMbps.toFixed(1) + " Mbps";
+
+        const inputValue = parseFloat(document.getElementById('mainInput').value) || 0;
+
+        if (currentMode === 'days') {
+            const days = inputValue;
+            const rawTB = (totalMbps * days * 86400) / 8 / 1024 / 1024;
+            const safeTB = rawTB * 1.1;
+            document.getElementById('resMainResult').textContent = safeTB.toFixed(2) + " TB";
+            document.getElementById('resultSub').textContent = "建議採購容量（含緩衝）";
+            recommendHDD(safeTB);
+        } else {
+            const diskTB = inputValue;
+            if (totalMbps <= 0) {
+                document.getElementById('resMainResult').textContent = "∞ 天"; return;
+            }
+            const seconds = (diskTB / 1.1 * 1024 * 1024 * 8) / totalMbps;
+            const days = seconds / 86400;
+            document.getElementById('resMainResult').textContent = days.toFixed(1) + " 天";
+            document.getElementById('resultSub').textContent = `使用 ${diskTB}TB 硬碟估算`;
+            const sug = document.getElementById('resSuggestion');
+            if (days < 7) sug.textContent = "低於一週";
+            else if (days < 30) sug.textContent = "標準範圍";
+            else sug.textContent = "長效錄影";
+            sug.style.color = days < 7 ? '#ef4444' : '#10b981';
+            sug.style.fontSize = "2.4rem";
+        }
+    }
+
+    function recommendHDD(tb) {
+        const disks = [1,2,4,6,8,10,12,14,16,18,20,22,24];
+        let text = "-";
+        if (tb > 0) {
+            const single = disks.find(d => d >= tb);
+            if (single && single <= 24) text = `${single}TB × 1`;
+            else {
+                const half = disks.find(d => d >= Math.ceil(tb/2));
+                text = half ? `${half}TB × 2` : "需多顆 RAID";
+            }
+        }
+        document.getElementById('resSuggestion').textContent = text;
+    }
+
+    document.getElementById('mainInput').addEventListener('input', calculateAll);
+
+    window.onload = function() {
+        document.getElementById('cameraRows').innerHTML = '';
+        addRow();
+        setMode('days');
+    };
+</script>
+
+</body>
+</html>
